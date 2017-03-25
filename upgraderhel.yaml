@@ -1,0 +1,69 @@
+#!/usr/bin/env ansible-playbook
+---
+- name: Upgrading RHEL host
+  hosts: rhel
+  become: True
+  vars_files:
+     - ~/.redhat/rhel_host
+  tasks:
+     - name: Inserting SSH Keys{{ ':' }} ssh_key_redmaltron
+       lineinfile: dest=/root/.ssh/authorized_keys state=present create=True line={{ ssh_key_redmaltron }}
+       when: ssh_key_redmaltron is defined
+       tags:
+          - prepare
+
+     - name: Inserting SSH Keys{{ ':' }} ssh_key_macmaltron
+       lineinfile: dest=/root/.ssh/authorized_keys state=present create=True line={{ ssh_key_macmaltron }}
+       when: ssh_key_macmaltron is defined
+       tags:
+          - prepare
+
+     - name: RED HAT SUBSCRIPTION{{ ':' }} Installing Red Hat's Subscription Manager
+       yum: name=subscription-manager state=latest
+       ignore_errors: True
+       tags:
+          - prepare
+
+     - name: List all Repositories already existing in this computer
+       find: paths=/etc/yum.repos.d/ patterns="*.repo"
+       register: existing_repositories
+       tags:
+          - prepare
+
+     - name: Remove all Repositories files current existing
+       file: path={{ item.path }}  state=absent
+       with_items: "{{ existing_repositories.files }}"
+       tags:
+          - prepare
+
+     - name: RED HAT SUBSCRIPTION{{ ':' }} Registering to Red Hat's Subscription Manager
+       command: subscription-manager register --username={{ subscription_manager_username }}  --password={{ subscription_manager_password }}
+       tags:
+          - prepare
+
+     - name: RED HAT SUBSCRIPTION{{ ':' }} Attaching a Pool ID
+       command: subscription-manager attach --pool={{ subscription_manager_poolid }}
+       tags:
+          - prepare
+  
+     - name: RED HAT SUBSCRIPTION{{ ':' }} Disable all Repositories
+       command: subscription-manager repos --disable="*"
+       tags:
+          - prepare
+
+     - name: RED HAT SUBSCRIPTION{{ ':' }} Enabling Repository
+       command: subscription-manager repos --enable={{ item }}
+       with_items: "{{ subscription_manager_repositories }}"
+       tags:
+          - prepare
+
+     - name: Updating entire host
+       yum: name=* state=latest
+       tags:
+          - prepare
+
+     - name: Installing Basic Applications
+       yum: name="{{ item }}" state=present
+       with_items: "{{ yum_packages }}"
+       tags:
+          - prepare

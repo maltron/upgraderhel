@@ -1,0 +1,1 @@
+rhel ansible_host=192.168.1.154 ansible_port=22 ansible_user=root ansible_password=r3dh4t1!
